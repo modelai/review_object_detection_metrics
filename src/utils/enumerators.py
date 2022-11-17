@@ -41,6 +41,7 @@ class BBFormat(Enum):
     XYX2Y2 = 2
     PASCAL_XML = 3
     YOLO = 4
+    XCYCWH = 5
 
 
 class FileFormat(Enum):

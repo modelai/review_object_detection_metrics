@@ -22,9 +22,7 @@ def replace_id_with_classes(bounding_boxes, filepath_classes_det):
     classes = get_classes_from_txt_file(filepath_classes_det)
     for bb in bounding_boxes:
         if not is_str_int(bb.get_class_id()):
-            print(
-                f'Warning: Class id represented in the {filepath_classes_det} is not a valid integer.'
-            )
+            print(f'Warning: Class id represented in the {filepath_classes_det} is not a valid integer.')
             return bounding_boxes
         class_id = int(bb.get_class_id())
         if class_id not in range(len(classes)):
@@ -50,34 +48,46 @@ def convert_box_xyxy2xywh(box):
     return arr
 
 
-# size => (width, height) of the image
-# box => (X1, X2, Y1, Y2) of the bounding box
-def convert_to_relative_values(size, box):
-    dw = 1. / (size[0])
-    dh = 1. / (size[1])
-    cx = (box[1] + box[0]) / 2.0
-    cy = (box[3] + box[2]) / 2.0
-    w = box[1] - box[0]
-    h = box[3] - box[2]
-    x = cx * dw
-    y = cy * dh
-    w = w * dw
-    h = h * dh
+def convert_to_relative_values(size_wh, box_xyxy):
+    """
+    convert abs x1,y1,x2,y2 to rel xc,yc,w,h
+    param:
+        size_wh: (width, height) of the image
+        box: (x1, y1, x2, y2) of the bounding box
+    output:
+        (xc, yc, w, h)
+    """
+    dw = 1. / (size_wh[0])
+    dh = 1. / (size_wh[1])
+    cx = (box_xyxy[2] + box_xyxy[0]) / 2.0
+    cy = (box_xyxy[3] + box_xyxy[1]) / 2.0
+    w = box_xyxy[2] - box_xyxy[0]
+    h = box_xyxy[3] - box_xyxy[1]
+    rel_cx = cx * dw
+    rel_cy = cy * dh
+    rel_w = w * dw
+    rel_h = h * dh
     # YOLO's format
     # x,y => (bounding_box_center)/width_of_the_image
     # w => bounding_box_width / width_of_the_image
     # h => bounding_box_height / height_of_the_image
-    return (x, y, w, h)
+    return (rel_cx, rel_cy, rel_w, rel_h)
 
 
-# size => (width, height) of the image
-# box => (centerX, centerY, w, h) of the bounding box relative to the image
-def convert_to_absolute_values(size, box):
-    w_box = size[0] * box[2]
-    h_box = size[1] * box[3]
+def convert_to_absolute_values(size_wh, box_xcycwh):
+    """
+    convert float rel xc,yc,w,h to int abs x1,y1,x2,y2
+    param:
+        size_wh: (width, height) of the image
+        box_xcycwh: (xc, yc, w, h) of the bounding box relative to the image
+    output:
+        round(x1), round(y1), round(x2), round(y2)
+    """
+    w_box = size_wh[0] * box_xcycwh[2]
+    h_box = size_wh[1] * box_xcycwh[3]
 
-    x1 = (float(box[0]) * float(size[0])) - (w_box / 2)
-    y1 = (float(box[1]) * float(size[1])) - (h_box / 2)
+    x1 = (float(box_xcycwh[0]) * float(size_wh[0])) - (w_box / 2)
+    y1 = (float(box_xcycwh[1]) * float(size_wh[1])) - (h_box / 2)
     x2 = x1 + w_box
     y2 = y1 + h_box
     return (round(x1), round(y1), round(x2), round(y2))
@@ -111,10 +121,8 @@ def add_bb_into_image(image, bb, color=(255, 0, 0), thickness=2, label=None):
         r_Yin = y1 - th - int(thickness / 2)
         # Draw filled rectangle to put the text in it
         cv2.rectangle(image, (r_Xin, r_Yin - thickness),
-                      (r_Xin + tw + thickness * 3, r_Yin + th + int(12.5 * fontScale)), (b, g, r),
-                      -1)
-        cv2.putText(image, label, (xin_bb, yin_bb), font, fontScale, (0, 0, 0), fontThickness,
-                    cv2.LINE_AA)
+                      (r_Xin + tw + thickness * 3, r_Yin + th + int(12.5 * fontScale)), (b, g, r), -1)
+        cv2.putText(image, label, (xin_bb, yin_bb), font, fontScale, (0, 0, 0), fontThickness, cv2.LINE_AA)
     return image
 
 
@@ -231,8 +239,7 @@ def draw_bb_into_image(image, boundingBox, color, thickness, label=None):
 
     xIn = boundingBox[0]
     yIn = boundingBox[1]
-    cv2.rectangle(image, (boundingBox[0], boundingBox[1]), (boundingBox[2], boundingBox[3]),
-                  (b, g, r), thickness)
+    cv2.rectangle(image, (boundingBox[0], boundingBox[1]), (boundingBox[2], boundingBox[3]), (b, g, r), thickness)
     # Add label
     if label is not None:
         # Get size of the text box
@@ -246,18 +253,12 @@ def draw_bb_into_image(image, boundingBox, color, thickness, label=None):
         r_Yin = yin_bb - th - int(thickness / 2)
         # Draw filled rectangle to put the text in it
         cv2.rectangle(image, (r_Xin, r_Yin - thickness),
-                      (r_Xin + tw + thickness * 3, r_Yin + th + int(12.5 * fontScale)), (b, g, r),
-                      -1)
-        cv2.putText(image, label, (xin_bb, yin_bb), font, fontScale, (0, 0, 0), fontThickness,
-                    cv2.LINE_AA)
+                      (r_Xin + tw + thickness * 3, r_Yin + th + int(12.5 * fontScale)), (b, g, r), -1)
+        cv2.putText(image, label, (xin_bb, yin_bb), font, fontScale, (0, 0, 0), fontThickness, cv2.LINE_AA)
     return image
 
 
-def plot_bb_per_classes(dict_bbs_per_class,
-                        horizontally=True,
-                        rotation=0,
-                        show=False,
-                        extra_title=''):
+def plot_bb_per_classes(dict_bbs_per_class, horizontally=True, rotation=0, show=False, extra_title=''):
     plt.close()
     if horizontally:
         ypos = np.arange(len(dict_bbs_per_class.keys()))
