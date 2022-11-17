@@ -1,16 +1,15 @@
-
 import os
 import pickle
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import src.evaluators.coco_evaluator as coco_evaluator
-import src.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
-import src.utils.converter as converter
-import src.utils.general_utils as general_utils
-from src.bounding_box import BoundingBox
-from src.utils.enumerators import BBFormat, BBType, MethodAveragePrecision
+import object_detection_metrics.evaluators.coco_evaluator as coco_evaluator
+import object_detection_metrics.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
+import object_detection_metrics.utils.converter as converter
+import object_detection_metrics.utils.general_utils as general_utils
+from object_detection_metrics.bounding_box import BoundingBox
+from object_detection_metrics.utils.enumerators import BBFormat, BBType, MethodAveragePrecision
 
 #############################################################
 # DEFINE GROUNDTRUTHS AND DETECTIONS
@@ -38,7 +37,6 @@ dir_gts = '/home/rafael/thesis/review_object_detection_metrics/toyexample/gts_vo
 dir_dets = '/home/rafael/thesis/review_object_detection_metrics/toyexample/dets_yolo_format'
 filepath_yolo_names = '/home/rafael/thesis/review_object_detection_metrics/toyexample/voc.names'
 
-
 # gt_bbs = converter.vocpascal2bb(dir_gts)
 # det_bbs = converter.yolo2bb(dir_dets,  dir_imgs, filepath_yolo_names, bb_type=BBType.DETECTED)
 
@@ -65,5 +63,6 @@ coco_res2 = coco_evaluator.get_coco_metrics(gt_bbs, det_bbs)
 ious = [0.5, 0.75]
 voc_res = {}
 for iou in ious:
-    voc_res[iou], mAP = pascal_voc_evaluator.get_pascalvoc_metrics(gt_bbs, det_bbs, iou, generate_table=True, method=MethodAveragePrecision.EVERY_POINT_INTERPOLATION)
+    voc_res[iou], mAP = pascal_voc_evaluator.get_pascalvoc_metrics(
+        gt_bbs, det_bbs, iou, generate_table=True, method=MethodAveragePrecision.EVERY_POINT_INTERPOLATION)
     pascal_voc_evaluator.plot_precision_recall_curves(voc_res[iou], showInterpolatedPrecision=True, showAP=True)

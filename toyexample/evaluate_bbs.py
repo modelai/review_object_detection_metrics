@@ -1,14 +1,11 @@
-
-
 import matplotlib.pyplot as plt
 import numpy as np
-import src.evaluators.coco_evaluator as coco_evaluator
-import src.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
-import src.utils.converter as converter
-import src.utils.general_utils as general_utils
-from src.bounding_box import BoundingBox
-from src.utils.enumerators import (BBFormat, BBType, CoordinatesType,
-                                   MethodAveragePrecision)
+import object_detection_metrics.evaluators.coco_evaluator as coco_evaluator
+import object_detection_metrics.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
+import object_detection_metrics.utils.converter as converter
+import object_detection_metrics.utils.general_utils as general_utils
+from object_detection_metrics.bounding_box import BoundingBox
+from object_detection_metrics.utils.enumerators import (BBFormat, BBType, CoordinatesType, MethodAveragePrecision)
 
 #############################################################
 # DEFINE GROUNDTRUTHS AND DETECTIONS
@@ -18,11 +15,8 @@ dir_gts = 'toyexample/gts_vocpascal_format'
 dir_dets = 'toyexample/dets_classname_abs_xywh'
 dir_outputs = 'toyexample/images_with_bbs'
 
-def plot_bb_per_classes(dict_bbs_per_class,
-                        horizontally=True,
-                        rotation=0,
-                        show=False,
-                        extra_title=''):
+
+def plot_bb_per_classes(dict_bbs_per_class, horizontally=True, rotation=0, show=False, extra_title=''):
     plt.close()
     if horizontally:
         ypos = np.arange(len(dict_bbs_per_class.keys()))
@@ -38,13 +32,18 @@ def plot_bb_per_classes(dict_bbs_per_class,
     title = f'Distribution of bounding boxes per class {extra_title}'
     plt.title(title)
     if show:
-        plt.tick_params(axis='x', labelsize=10) # Set the x-axis label size
+        plt.tick_params(axis='x', labelsize=10)  # Set the x-axis label size
         plt.show(block=True)
     return plt
 
+
 # Get annotations (ground truth and detections)
 gt_bbs = converter.vocpascal2bb(dir_gts)
-det_bbs = converter.text2bb(dir_dets, bb_type=BBType.DETECTED, bb_format=BBFormat.XYWH,type_coordinates=CoordinatesType.ABSOLUTE, img_dir=dir_imgs)
+det_bbs = converter.text2bb(dir_dets,
+                            bb_type=BBType.DETECTED,
+                            bb_format=BBFormat.XYWH,
+                            type_coordinates=CoordinatesType.ABSOLUTE,
+                            img_dir=dir_imgs)
 
 # Leave only the annotations of cats
 gt_bbs = [bb for bb in gt_bbs if bb.get_class_id() == 'cat']
@@ -68,6 +67,10 @@ coco_res2 = coco_evaluator.get_coco_metrics(gt_bbs, det_bbs)
 ious = [0.5, 0.75]
 voc_res = {}
 for iou in ious:
-    dict_res = pascal_voc_evaluator.get_pascalvoc_metrics(gt_bbs, det_bbs, iou, generate_table=True, method=MethodAveragePrecision.ELEVEN_POINT_INTERPOLATION)
+    dict_res = pascal_voc_evaluator.get_pascalvoc_metrics(gt_bbs,
+                                                          det_bbs,
+                                                          iou,
+                                                          generate_table=True,
+                                                          method=MethodAveragePrecision.ELEVEN_POINT_INTERPOLATION)
     voc_res = dict_res['per_class']
     pascal_voc_evaluator.plot_precision_recall_curves(voc_res, showInterpolatedPrecision=True, showAP=True)

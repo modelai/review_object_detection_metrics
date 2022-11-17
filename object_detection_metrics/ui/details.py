@@ -4,13 +4,12 @@ import random
 import cv2
 import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import QFileDialog, QMainWindow
-from src.bounding_box import BoundingBox
-from src.ui.details_ui import Ui_Dialog as Details_UI
-from src.utils import general_utils
-from src.utils.enumerators import BBType
-from src.utils.general_utils import (add_bb_into_image, get_files_dir,
-                                     remove_file_extension,
-                                     show_image_in_qt_component)
+from object_detection_metrics.bounding_box import BoundingBox
+from object_detection_metrics.ui.details_ui import Ui_Dialog as Details_UI
+from object_detection_metrics.utils import general_utils
+from object_detection_metrics.utils.enumerators import BBType
+from object_detection_metrics.utils.general_utils import (add_bb_into_image, get_files_dir, remove_file_extension,
+                                                          show_image_in_qt_component)
 
 
 class Details_Dialog(QMainWindow, Details_UI):
