@@ -1,7 +1,7 @@
 
 
 <p align="left">
-  
+
 <a>[![Build Status](https://travis-ci.com/rafaelpadilla/review_object_detection_metrics.svg?branch=main)](https://travis-ci.com/rafaelpadilla/review_object_detection_metrics)</a>
 <a href="https://github.com/rafaelpadilla/review_object_detection_metrics/raw/main/published_paper.pdf">
     <img src="https://img.shields.io/badge/paper-published-blue"/></a>
@@ -12,7 +12,7 @@
 
 ## Citation
 
-This work was published in the [Journal Electronics - Special Issue Deep Learning Based Object Detection](https://www.mdpi.com/2079-9292/10/3/279). 
+This work was published in the [Journal Electronics - Special Issue Deep Learning Based Object Detection](https://www.mdpi.com/2079-9292/10/3/279).
 
 If you use this code for your research, please consider citing:
 
@@ -32,6 +32,11 @@ DOI = {10.3390/electronics10030279}
 ```
 Download the paper [here](https://www.mdpi.com/2079-9292/10/3/279/pdf) or [here](https://github.com/rafaelpadilla/review_object_detection_metrics/blob/main/published_paper.pdf).
 
+
+# install
+```
+pip install "git+https://github.com/modelai/review_object_detection_metrics@ymir"
+```
 
 Open-Source Visual Interface for Object Detection Metrics
 ================================================
@@ -55,7 +60,7 @@ Ideally, in order to have trustworthy benchmarking among different approaches, i
     - [mAP with IOU Threshold *t=0.5*](#map-with-iou-threshold-t05)
     - [AP@.5 and AP@.75](#ap5-and-ap75)
     - [AP@[.5:.05:.95]](#ap50595)
-    - [AP<sub>S</sub>, AP<sub>M</sub> and AP<sub>L</sub>](#AP-s-AP-M-AP-L)  
+    - [AP<sub>S</sub>, AP<sub>M</sub> and AP<sub>L</sub>](#AP-s-AP-M-AP-L)
   - [**Spatio-Temporal Tube Average Precision (STT-AP)**](#spatio-temporal-tube-average-precision-stt-ap)
   - [How to use this project](#how-to-use-this-project)
     - [Requirements](#requirements)
@@ -209,13 +214,13 @@ Based on these definitions, the proposed STT-AP metric follows the AP.
 
 We highly suggest you to create an [anaconda](https://docs.anaconda.com/anaconda/install/) environment using the `environment.yml` file available in this repository. To create the environment and install all necessary packages, run the following command:
 
-`conda env create -n <env_name> --file environment.yml`  
+`conda env create -n <env_name> --file environment.yml`
 
-Now activate the evironment: `conda activate <env_name>`  
+Now activate the evironment: `conda activate <env_name>`
 
-Install the tool: `python setup.py install`  
+Install the tool: `python setup.py install`
 
-Run the UI: `python run.py`  
+Run the UI: `python run.py`
 
 ### Running
 
@@ -311,7 +316,7 @@ For detection with STT, use a .json file following format:
 ```
 See [example annotation](https://github.com/rafaelpadilla/review_object_detection_metrics/blob/main/tests/tube/example_anno.json)  and [example predictions](https://github.com/rafaelpadilla/review_object_detection_metrics/blob/main/tests/tube/example_preds.json) for examples of annotation and prediction .json files.
 
-##### Running  
+##### Running
 
 ```python
 from src.evaluators.tube_evaluator import TubeEvaluator
