@@ -1,7 +1,8 @@
 import json
 import os
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa
 
+import warnings
 import pandas as pd
 from object_detection_metrics.utils.enumerators import CoordinatesType
 from object_detection_metrics.utils.general_utils import get_files_recursively
@@ -440,7 +441,7 @@ def all_lines_have_blocks(file_path, num_blocks=[]):
     """
     with open(file_path, 'r+') as f:
         for line in f:
-            line = line.replace('\n', '').strip()
+            line = line.strip()
             if line == '':
                 continue
             passed = False
@@ -461,30 +462,34 @@ def all_blocks_have_absolute_values(file_path, blocks_abs_values=[]):
         Path of the file.
     blocks_abs_values : list
         List containing possible amounts of blocks.
-        (e.g. if your annotation file is in the format '32 1 23 180 300 750', it contains 6 blocks with absolute values)
+        (e.g. if your annotation file is in the format '32 1 23 180 300 750', it contains 6 blocks with absolute values
+        e.g. if your annotation file is in the format class_id score 0.5 0.5 30.2 30.4)
 
     Returns
     -------
     bool
         True if all the annotations in the file pass contain at least 1 block specified in the blocks_abs_values and all blocks contain absolute values. False otherwise.
     """
+    passed = False
     with open(file_path, 'r+') as f:
         for line in f:
-            line = line.replace('\n', '').strip()
+            line = line.strip()
             if line == '':
                 continue
-            passed = False
+
             splitted = line.split(' ')
             for block in blocks_abs_values:
                 if len(splitted) < block:
                     return False
                 try:
-                    if float(splitted[block]) == int(float(splitted[block])):
+                    if float(splitted[block]) == int(float(splitted[block])) or float(splitted[block]) > 1:
                         passed = True
                 except:
                     passed = False
-            if passed is False:
-                return False
+
+    if passed is False:
+        warnings.warn(f'{file_path} maybe relative value ')
+        return False
     return True
 
 

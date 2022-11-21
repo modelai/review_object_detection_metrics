@@ -8,7 +8,7 @@ import object_detection_metrics.utils.general_utils as general_utils
 import object_detection_metrics.utils.validations as validations
 from object_detection_metrics.bounding_box import BoundingBox
 from object_detection_metrics.utils.enumerators import BBFormat, BBType, CoordinatesType
-
+from tqdm import tqdm
 
 def _get_annotation_files(file_path):
     # Path can be a directory containing all files or a directory containing multiple files
@@ -82,8 +82,9 @@ def cvat2bb(path):
     ret = []
     # Get annotation files in the path
     annotation_files = _get_annotation_files(path)
+    print(f'find {len(annotation_files)} ann files')
     # Loop through each file
-    for file_path in annotation_files:
+    for file_path in tqdm(annotation_files, desc='ann files'):
         if not validations.is_cvat_format(file_path):
             continue
 
@@ -242,7 +243,9 @@ def text2bb(annotations_path,
 
     # Get annotation files in the path
     annotation_files = _get_annotation_files(annotations_path)
-    for file_path in annotation_files:
+    print(f'find {len(annotation_files)} ann files')
+
+    for file_path in tqdm(annotation_files, desc='ann files'):
         if type_coordinates == CoordinatesType.ABSOLUTE:
             if bb_type == BBType.GROUND_TRUTH and not validations.is_absolute_text_format(
                     file_path, num_blocks=[5], blocks_abs_values=[4]):
@@ -281,19 +284,27 @@ def text2bb(annotations_path,
                 class_id = splitted_line[0]
                 if bb_type == BBType.GROUND_TRUTH:
                     confidence = None
-                    x1 = float(splitted_line[1])
-                    y1 = float(splitted_line[2])
-                    w = float(splitted_line[3])
-                    h = float(splitted_line[4])
+                    v1 = float(splitted_line[1])
+                    v2 = float(splitted_line[2])
+                    v3 = float(splitted_line[3])
+                    v4 = float(splitted_line[4])
                 elif bb_type == BBType.DETECTED:
-                    confidence = float(splitted_line[1])
-                    x1 = float(splitted_line[2])
-                    y1 = float(splitted_line[3])
-                    w = float(splitted_line[4])
-                    h = float(splitted_line[5])
+                    if bb_format == BBFormat.YOLO:
+                        # class_id, rel xc, yc, w, h, [optional score]
+                        confidence = float(splitted_line[5]) if len(splitted_line) > 5 else 1.0
+                        v1 = float(splitted_line[1])
+                        v2 = float(splitted_line[2])
+                        v3 = float(splitted_line[3])
+                        v4 = float(splitted_line[4])
+                    else:
+                        confidence = float(splitted_line[1])
+                        v1 = float(splitted_line[2])
+                        v2 = float(splitted_line[3])
+                        v3 = float(splitted_line[4])
+                        v4 = float(splitted_line[5])
                 bb = BoundingBox(image_name=img_filename,
                                  class_id=class_id,
-                                 coordinates=(x1, y1, w, h),
+                                 coordinates=(v1, v2, v3, v4),
                                  img_size=img_size,
                                  confidence=confidence,
                                  type_coordinates=type_coordinates,
@@ -303,6 +314,7 @@ def text2bb(annotations_path,
                 x, y, w, h = bb.get_absolute_bounding_box(format=BBFormat.XYWH)
                 _, _, x2, y2 = bb.get_absolute_bounding_box(format=BBFormat.XYX2Y2)
                 if x < 0 or y < 0 or w < 0 or h < 0 or x2 < 0 or y2 < 0:
+                    print(f"remove line {line} in file {file_path}")
                     continue
                 ret.append(bb)
     return ret
