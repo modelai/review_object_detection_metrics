@@ -1,7 +1,9 @@
 import base64
 import json
 import os
+import re
 import xml.etree.ElementTree as ET
+from typing import Dict, Tuple, List
 
 import pandas as pd
 import object_detection_metrics.utils.general_utils as general_utils
@@ -9,17 +11,35 @@ import object_detection_metrics.utils.validations as validations
 from object_detection_metrics.bounding_box import BoundingBox
 from object_detection_metrics.utils.enumerators import BBFormat, BBType, CoordinatesType
 from tqdm import tqdm
+import imagesize
 
-def _get_annotation_files(file_path):
+
+def _get_annotation_files(file_path, is_index_file=False):
+    """
+    use file_path or index_file to obtain annotation files
+    """
     # Path can be a directory containing all files or a directory containing multiple files
     if file_path is None:
         return []
-    annotation_files = []
-    if os.path.isfile(file_path):
-        annotation_files = [file_path]
-    elif os.path.isdir(file_path):
-        annotation_files = general_utils.get_files_recursively(file_path)
-    return sorted(annotation_files)
+
+    if not is_index_file:
+        annotation_files = []
+        if os.path.isfile(file_path):
+            annotation_files = [file_path]
+        elif os.path.isdir(file_path):
+            annotation_files = general_utils.get_files_recursively(file_path)
+        return sorted(annotation_files)
+    else:
+        with open(file_path, 'r') as fp:
+            lines = fp.readlines()
+
+        annotation_files = []
+        for line in lines:
+            # support ymir index file
+            ann_path = line.strip().split()[-1]
+            annotation_files.append(ann_path)
+
+        return sorted(annotation_files)
 
 
 def coco2bb(path, bb_type=BBType.GROUND_TRUTH):
@@ -46,10 +66,7 @@ def coco2bb(path, bb_type=BBType.GROUND_TRUTH):
         images = {}
         # into dictionary
         for i in json_object['images']:
-            images[i['id']] = {
-                'file_name': i['file_name'],
-                'img_size': (int(i['width']), int(i['height']))
-            }
+            images[i['id']] = {'file_name': i['file_name'], 'img_size': (int(i['width']), int(i['height']))}
         annotations = []
         if 'annotations' in json_object:
             annotations = json_object['annotations']
@@ -96,9 +113,8 @@ def cvat2bb(path):
 
             # Loop through the boxes
             for box_info in image_info.iter('box'):
-                x1, y1, x2, y2 = float(box_info.attrib['xtl']), float(
-                    box_info.attrib['ytl']), float(box_info.attrib['xbr']), float(
-                        box_info.attrib['ybr'])
+                x1, y1, x2, y2 = float(box_info.attrib['xtl']), float(box_info.attrib['ytl']), float(
+                    box_info.attrib['xbr']), float(box_info.attrib['ybr'])
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
                 bb = BoundingBox(image_name=img_name,
@@ -238,11 +254,13 @@ def text2bb(annotations_path,
             bb_type=BBType.GROUND_TRUTH,
             bb_format=BBFormat.XYWH,
             type_coordinates=CoordinatesType.ABSOLUTE,
-            img_dir=None):
+            img_dir=None,
+            img_to_ann=None,
+            ann_path_is_index_file=False):
     ret = []
 
     # Get annotation files in the path
-    annotation_files = _get_annotation_files(annotations_path)
+    annotation_files = _get_annotation_files(annotations_path, is_index_file=ann_path_is_index_file)
     print(f'find {len(annotation_files)} ann files')
 
     for file_path in tqdm(annotation_files, desc='ann files'):
@@ -269,18 +287,23 @@ def text2bb(annotations_path,
             img_size = None
             # If coordinates are relative, image size must be obtained in the img_dir
             if type_coordinates == CoordinatesType.RELATIVE:
-                img_path = general_utils.find_image_file(img_dir, img_filename + file_suffix)
+                if img_dir:
+                    img_path = general_utils.find_image_file(img_dir, img_filename + file_suffix)
+                elif img_to_ann:
+                    img_path = img_to_ann[file_path]
+                else:
+                    raise Exception(f'relative should offer {img_dir} or {img_path}')
+
                 if img_path is None or os.path.isfile(img_path) is False:
-                    print(
-                        f'Warning: Image not found in the directory {img_path}. It is required to get its dimensions'
-                    )
+                    print(f'Warning: Image not found in the directory {img_path}. It is required to get its dimensions')
                     return ret
                 resolution = general_utils.get_image_resolution(img_path)
                 img_size = (resolution['width'], resolution['height'])
             for line in f:
                 if line.replace(' ', '') == '\n':
                     continue
-                splitted_line = line.split(' ')
+
+                splitted_line = [p for p in re.split(pattern='[, ]', string=line) if p]
                 class_id = splitted_line[0]
                 if bb_type == BBType.GROUND_TRUTH:
                     confidence = None
@@ -321,6 +344,9 @@ def text2bb(annotations_path,
 
 
 def yolo2bb(annotations_path, images_dir, file_obj_names, bb_type=BBType.GROUND_TRUTH):
+    """yolov3 format
+    class_name, cx,cy,w,h
+    """
     ret = []
     if not os.path.isfile(file_obj_names):
         print(f'Warning: File with names of classes {file_obj_names} not found.')
@@ -350,8 +376,7 @@ def yolo2bb(annotations_path, images_dir, file_obj_names, bb_type=BBType.GROUND_
                 splitted_line = line.split(' ')
                 class_id = splitted_line[0]
                 if not general_utils.is_str_int(class_id):
-                    print(
-                        f'Warning: Class id represented in the {file_path} is not a valid integer.')
+                    print(f'Warning: Class id represented in the {file_path} is not a valid integer.')
                     return []
                 class_id = int(class_id)
                 if class_id not in range(len(all_classes)):
@@ -413,15 +438,14 @@ def xml2csv(xml_path):
             )
             xml_list.append(value)
             column_name = [
-                'ImageID', 'Source', 'LabelName', 'Confidence', 'XMin', 'XMax', 'YMin', 'YMax',
-                'IsOccluded', 'IsTruncated', 'IsGroupOf', 'IsDepiction', 'IsInside', 'width',
-                'height'
+                'ImageID', 'Source', 'LabelName', 'Confidence', 'XMin', 'XMax', 'YMin', 'YMax', 'IsOccluded',
+                'IsTruncated', 'IsGroupOf', 'IsDepiction', 'IsInside', 'width', 'height'
             ]
             xml_df = pd.DataFrame(xml_list, columns=column_name)
     except Exception as e:
         return pd.DataFrame(columns=[
-            'ImageID', 'Source', 'LabelName', 'Confidence', 'XMin', 'XMax', 'YMin', 'YMax',
-            'IsOccluded', 'IsTruncated', 'IsGroupOf', 'IsDepiction', 'IsInside', 'width', 'height'
+            'ImageID', 'Source', 'LabelName', 'Confidence', 'XMin', 'XMax', 'YMin', 'YMax', 'IsOccluded', 'IsTruncated',
+            'IsGroupOf', 'IsDepiction', 'IsInside', 'width', 'height'
         ])
     if xml_df.empty:
         return pd.DataFrame.from_dict({
@@ -448,13 +472,14 @@ def xml2csv(xml_path):
 
 def df2labelme(symbolDict, dir_image):
     try:
-        symbolDict.rename(columns={
-            'LabelName': 'label',
-            'ImageID': 'imagePath',
-            'height': 'imageHeight',
-            'width': 'imageWidth'
-        },
-                          inplace=True)
+        symbolDict.rename(inplace=True,
+                          columns={
+                              'LabelName': 'label',
+                              'ImageID': 'imagePath',
+                              'height': 'imageHeight',
+                              'width': 'imageWidth'
+                          })
+
         # Get image path
         image_path = general_utils.find_file(dir_image, symbolDict['imagePath'][0])
         assert image_path is not None
@@ -469,11 +494,103 @@ def df2labelme(symbolDict, dir_image):
             symbolDict['shape_type'] = 'rectangle'
             symbolDict['group_id'] = None
             symbolDict = symbolDict.groupby(['imagePath', 'imageWidth', 'imageHeight', 'imageData'])
-            symbolDict = (
-                symbolDict.apply(lambda x: x[['label', 'points', 'shape_type', 'group_id']].to_dict(
-                    'records')).reset_index().rename(columns={0: 'shapes'}))
+            symbolDict = (symbolDict.apply(lambda x: x[['label', 'points', 'shape_type', 'group_id']].to_dict('records')
+                                           ).reset_index().rename(columns={0: 'shapes'}))
         converted_json = json.loads(symbolDict.to_json(orient='records'))[0]
     except Exception as e:
         converted_json = {}
         print('error in labelme conversion:{}'.format(e))
     return converted_json
+
+
+def ymir2bb(ymir_index_file: str,
+            bb_type: BBType = BBType.GROUND_TRUTH,
+            bb_format: BBFormat = BBFormat.XYX2Y2,
+            type_coordinates: CoordinatesType = CoordinatesType.ABSOLUTE) -> List[BoundingBox]:
+    with open(ymir_index_file) as fp:
+        lines = fp.readlines()
+
+    img_to_ann = {}
+    for line in lines:
+        img_f, ann_f = line.split()
+        img_to_ann[img_f] = ann_f
+
+    return dict2bb(img_to_ann=img_to_ann, bb_type=bb_type, bb_format=bb_format, type_coordinates=type_coordinates)
+
+
+def dict2bb(img_to_ann: Dict[str, str],
+            bb_type: BBType = BBType.GROUND_TRUTH,
+            bb_format: BBFormat = BBFormat.XYX2Y2,
+            type_coordinates: CoordinatesType = CoordinatesType.ABSOLUTE) -> List[BoundingBox]:
+
+    bbs = []
+    for img_f, ann_f in tqdm(img_to_ann.items(), desc='img to ann'):
+        img_size = imagesize.get(img_f)  # width, height
+        bbs.extend(
+            file2bb(ann_f, bb_type=bb_type, bb_format=bb_format, type_coordinates=type_coordinates, img_size=img_size))
+    return bbs
+
+
+def file2bb(ann_path: str,
+            bb_type: BBType = BBType.GROUND_TRUTH,
+            bb_format: BBFormat = BBFormat.XYX2Y2,
+            type_coordinates: CoordinatesType = CoordinatesType.ABSOLUTE,
+            img_size: Tuple[int, int] = None) -> List[BoundingBox]:
+
+    if not os.path.isfile(ann_path):
+        return []
+
+    with open(ann_path, 'r') as fp:
+        lines = fp.readlines()
+
+    img_filename = os.path.basename(ann_path)
+    raw_filename, _ = os.path.splitext(img_filename)
+
+    ret = []
+    for line in lines:
+        # split with space or comma
+        splitted_line = [p for p in re.split(pattern='[, ]', string=line) if p]
+        # TODO support class_names
+        class_id = splitted_line[0]
+
+        # class_id, v1, v2, v3, v4
+        if bb_type == BBType.GROUND_TRUTH:
+            confidence = None
+            v1 = float(splitted_line[1])
+            v2 = float(splitted_line[2])
+            v3 = float(splitted_line[3])
+            v4 = float(splitted_line[4])
+        elif bb_type == BBType.DETECTED:
+            if bb_format == BBFormat.YOLO:
+                # class_id, rel xc, yc, w, h, [optional score]
+                confidence = float(splitted_line[5]) if len(splitted_line) > 5 else 1.0
+                v1 = float(splitted_line[1])
+                v2 = float(splitted_line[2])
+                v3 = float(splitted_line[3])
+                v4 = float(splitted_line[4])
+            else:
+                confidence = float(splitted_line[1])
+                v1 = float(splitted_line[2])
+                v2 = float(splitted_line[3])
+                v3 = float(splitted_line[4])
+                v4 = float(splitted_line[5])
+        else:
+            raise Exception(f'unknown BBType {bb_type}')
+
+        bb = BoundingBox(image_name=raw_filename,
+                         class_id=class_id,
+                         coordinates=(v1, v2, v3, v4),
+                         img_size=img_size,
+                         confidence=confidence,
+                         type_coordinates=type_coordinates,
+                         bb_type=bb_type,
+                         format=bb_format)
+
+        # If the format is correct, x,y,w,h,x2,y2 must be positive
+        x, y, w, h = bb.get_absolute_bounding_box(format=BBFormat.XYWH)
+        _, _, x2, y2 = bb.get_absolute_bounding_box(format=BBFormat.XYX2Y2)
+        if x < 0 or y < 0 or w < 0 or h < 0 or x2 < 0 or y2 < 0:
+            print(f"remove line {line} in file {ann_path}")
+            continue
+        ret.append(bb)
+    return ret
